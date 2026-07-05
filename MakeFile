@@ -1,277 +1,66 @@
-# =========================================================
-# GlobalRoamer AI Observability
-# Makefile
-# =========================================================
+PYTHON := .venv/Scripts/python.exe
+PIP := .venv/Scripts/pip.exe
 
-APP_NAME=globalroamer-ai
+CONFIG_DIR := etc
 
-PYTHON=python
-PIP=pip
+.PHONY: help install dev clean ingest analyze report ui workflow cleanup format lint test
 
-CONFIG_DIR=./etc
-
-DOCKER_COMPOSE=docker compose
-
-# =========================================================
-# Local environment
-# =========================================================
-
-.PHONY: venv
-
-venv:
-	python3.11 -m venv venv
-	@echo "Virtual environment created"
-
-# =========================================================
-# Install dependencies
-# =========================================================
-
-.PHONY: install
+help:
+	@echo =========================================
+	@echo GlobalRoamer AI Observability Layer
+	@echo =========================================
+	@echo install     - install dependencies
+	@echo dev         - install editable package
+	@echo ingest      - run ingestion pipeline
+	@echo analyze     - run AI analysis pipeline
+	@echo report      - generate reports
+	@echo ui          - start Streamlit UI
+	@echo workflow    - run full workflow
+	@echo cleanup     - cleanup old artifacts
+	@echo format      - run black + isort
+	@echo lint        - run flake8
+	@echo test        - run tests
+	@echo clean       - cleanup cache/temp files
 
 install:
-	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt
-	@echo "Dependencies installed"
 
-# =========================================================
-# Formatting
-# =========================================================
-
-.PHONY: format
-
-format:
-	black globalroamer_ai
-	isort globalroamer_ai
-	@echo "Formatting completed"
-
-# =========================================================
-# Lint
-# =========================================================
-
-.PHONY: lint
-
-lint:
-	flake8 globalroamer_ai
-	@echo "Lint completed"
-
-# =========================================================
-# Tests
-# =========================================================
-
-.PHONY: test
-
-test:
-	pytest tests -v
-	@echo "Tests completed"
-
-# =========================================================
-# Ingestion
-# =========================================================
-
-.PHONY: ingest
+dev:
+	$(PIP) install -e .[dev]
 
 ingest:
 	$(PYTHON) -m globalroamer_ai.ingest_main \
 		--config-dir $(CONFIG_DIR)
-
-# =========================================================
-# Analysis
-# =========================================================
-
-.PHONY: analyze
 
 analyze:
 	$(PYTHON) -m globalroamer_ai.analyze_main \
 		--config-dir $(CONFIG_DIR) \
 		--top-k 5
 
-# =========================================================
-# Reports
-# =========================================================
-
-.PHONY: report
-
 report:
 	$(PYTHON) -m globalroamer_ai.report_main \
-		--config-dir $(CONFIG_DIR)
+		--config-dir $(CONFIG_DIR) \
+		--max-chunks 20
 
-# =========================================================
-# Full workflow
-# =========================================================
-
-.PHONY: workflow
+ui:
+	streamlit run globalroamer_ai/streamlit_app.py
 
 workflow:
-	bash bash_files/run_workflow.sh
+	powershell -ExecutionPolicy Bypass -File .\scripts\run_workflow.ps1
 
-# =========================================================
-# Cleanup
-# =========================================================
+cleanup:
+	powershell -ExecutionPolicy Bypass -File .\scripts\cleanup_folders.ps1
 
-.PHONY: clean
+format:
+	$(PYTHON) -m black globalroamer_ai
+	$(PYTHON) -m isort globalroamer_ai
+
+lint:
+	$(PYTHON) -m flake8 globalroamer_ai
+
+test:
+	$(PYTHON) -m pytest
 
 clean:
-	bash bash_files/cleanup_folders.sh
-
-# =========================================================
-# Create directories
-# =========================================================
-
-.PHONY: init-dirs
-
-init-dirs:
-	mkdir -p var/input/traces
-	mkdir -p var/input/results
-	mkdir -p var/input/campaign_metadata
-
-	mkdir -p var/data/normalized_events
-	mkdir -p var/data/chunks
-	mkdir -p var/data/embeddings
-	mkdir -p var/data/vector_db
-
-	mkdir -p var/output/ai_summaries
-	mkdir -p var/output/root_cause_reports
-	mkdir -p var/output/campaign_health
-
-	mkdir -p var/log
-
-	@echo "Directories initialized"
-
-# =========================================================
-# Docker build
-# =========================================================
-
-.PHONY: docker-build
-
-docker-build:
-	$(DOCKER_COMPOSE) build
-
-# =========================================================
-# Docker run
-# =========================================================
-
-.PHONY: docker-run
-
-docker-run:
-	$(DOCKER_COMPOSE) up
-
-# =========================================================
-# Docker run background
-# =========================================================
-
-.PHONY: docker-run-bg
-
-docker-run-bg:
-	$(DOCKER_COMPOSE) up -d
-
-# =========================================================
-# Docker stop
-# =========================================================
-
-.PHONY: docker-stop
-
-docker-stop:
-	$(DOCKER_COMPOSE) down
-
-# =========================================================
-# Docker cleanup
-# =========================================================
-
-.PHONY: docker-clean
-
-docker-clean:
-	$(DOCKER_COMPOSE) down -v
-
-# =========================================================
-# Docker logs
-# =========================================================
-
-.PHONY: docker-logs
-
-docker-logs:
-	$(DOCKER_COMPOSE) logs -f
-
-# =========================================================
-# Open shell inside container
-# =========================================================
-
-.PHONY: docker-shell
-
-docker-shell:
-	docker exec -it $(APP_NAME) bash
-
-# =========================================================
-# Run ingestion inside container
-# =========================================================
-
-.PHONY: docker-ingest
-
-docker-ingest:
-	docker exec -it $(APP_NAME) \
-	python -m globalroamer_ai.ingest_main \
-	--config-dir ./etc
-
-# =========================================================
-# Run analysis inside container
-# =========================================================
-
-.PHONY: docker-analyze
-
-docker-analyze:
-	docker exec -it $(APP_NAME) \
-	python -m globalroamer_ai.analyze_main \
-	--config-dir ./etc \
-	--top-k 5
-
-# =========================================================
-# Run reports inside container
-# =========================================================
-
-.PHONY: docker-report
-
-docker-report:
-	docker exec -it $(APP_NAME) \
-	python -m globalroamer_ai.report_main \
-	--config-dir ./etc
-
-# =========================================================
-# Tail logs
-# =========================================================
-
-.PHONY: logs
-
-logs:
-	tail -f var/log/workflow.log
-
-# =========================================================
-# Show generated reports
-# =========================================================
-
-.PHONY: reports
-
-reports:
-	ls -lah var/output/ai_summaries/
-	ls -lah var/output/root_cause_reports/
-	ls -lah var/output/campaign_health/
-
-# =========================================================
-# Development helper
-# =========================================================
-
-.PHONY: dev
-
-dev:
-	make format
-	make lint
-	make test
-
-# =========================================================
-# Full production-like pipeline
-# =========================================================
-
-.PHONY: prod-run
-
-prod-run:
-	make ingest
-	make analyze
-	make report
+	powershell -Command "Get-ChildItem -Path . -Include __pycache__ -Recurse -Directory | Remove-Item -Recurse -Force"
+	powershell -Command "Get-ChildItem -Path . -Include *.pyc -Recurse | Remove-Item -Force"

@@ -1,0 +1,23 @@
+services:
+  globalroamer-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: globalroamer-ai
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./etc:/app/etc
+      - ./var/input:/app/var/input
+      - ./var/data:/app/var/data
+      - ./var/output:/app/var/output
+      - ./var/log:/app/var/log
+    command: >
+      streamlit run globalroamer_ai/streamlit_app.py
+      --server.address=0.0.0.0
+      --server.port=8501

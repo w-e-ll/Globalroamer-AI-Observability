@@ -6,249 +6,97 @@ import json
 import logging
 import os
 
-from datetime import datetime
+from dataclasses import asdict
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-from globalroamer_ai.lib.app_config import load_yaml_config
-from globalroamer_ai.lib.setup_logger import setup_logger
-
-from globalroamer_ai.lib.trace_loader import (
-    load_all_traces
-)
-
-from globalroamer_ai.lib.trace_parser import (
-    parse_trace_content
-)
-
-from globalroamer_ai.lib.trace_normalizer import (
-    normalize_parsed_trace
-)
-
-from globalroamer_ai.lib.trace_chunker import (
-    chunk_normalized_trace
-)
-
-from globalroamer_ai.lib.exceptions import (
-    GlobalRoamerAIException
-)
+from globalroamer_ai.core.app_config import load_yaml_config
+from globalroamer_ai.core.exceptions import GlobalRoamerAIException
+from globalroamer_ai.core.setup_logger import setup_logger
+from globalroamer_ai.ingestion.trace_loader import TraceLoader
+from globalroamer_ai.ingestion.trace_normalizer import TraceNormalizer
+from globalroamer_ai.ingestion.trace_parser import TraceParser
 
 load_dotenv()
 
 logger = logging.getLogger("ingest_main")
 
 
-def save_normalized_trace(
-    normalized_trace: dict,
-    output_dir: str
-) -> Path:
-    """
-    Save normalized trace JSON.
-    """
-
-    os.makedirs(output_dir, exist_ok=True)
-
-    trace_id = normalized_trace["trace_id"]
-
-    output_file = Path(output_dir) / f"{trace_id}.json"
-
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(
-            normalized_trace,
-            f,
-            indent=2,
-            ensure_ascii=False
-        )
-
-    logger.info(
-        f"Saved normalized trace: {output_file}"
-    )
-
-    return output_file
+def save_json(data: object, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
 
 
-def save_chunks(
-    chunks: list,
-    output_dir: str
-) -> Path:
-    """
-    Save chunks JSON.
-    """
-
-    os.makedirs(output_dir, exist_ok=True)
-
-    if not chunks:
-        raise ValueError("No chunks to save")
-
-    trace_id = chunks[0]["trace_id"]
-
-    output_file = Path(output_dir) / f"{trace_id}_chunks.json"
-
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(
-            chunks,
-            f,
-            indent=2,
-            ensure_ascii=False
-        )
-
-    logger.info(
-        f"Saved chunks: {output_file}"
-    )
-
-    return output_file
+def resolve_path(value: str | None, fallback: str) -> str:
+    return value if value else fallback
 
 
-def main():
-
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "--config-dir",
-        required=True,
-        help="Path to config directory"
-    )
-
+def main() -> None:
+    parser = argparse.ArgumentParser(prog="ingest_main.py")
+    parser.add_argument("--config-dir", required=True)
+    parser.add_argument("--trace-dir", required=False)
+    parser.add_argument("--report-dir", required=False)
+    parser.add_argument("--result-dir", required=False)
+    parser.add_argument("--mapping-path", required=False)
+    parser.add_argument("--output-dir", required=False)
     args = parser.parse_args()
 
-    # -----------------------------------------------------
-    # Load config
-    # -----------------------------------------------------
+    cfg = load_yaml_config(args.config_dir)
 
-    cfg = load_yaml_config(
-        args.config_dir
-    )
-
-    # -----------------------------------------------------
-    # Logger
-    # -----------------------------------------------------
-
-    logfile = os.path.join(
-        cfg.log_dir,
-        "ingest.log"
-    )
-
+    logfile = os.path.join(cfg.log_dir, "ingest.log")
     setup_logger(logfile)
 
-    logger.info(
-        "=== GlobalRoamer AI Ingest Started ==="
-    )
+    trace_dir = resolve_path(args.trace_dir, cfg.input_trace_dir)
+    result_dir = resolve_path(args.result_dir, cfg.input_result_dir)
+    report_dir = resolve_path(args.report_dir, cfg.input_report_dir)
+    output_dir = Path(resolve_path(args.output_dir, cfg.normalized_dir))
 
-    logger.info(
-        f"Environment: {cfg.env}"
-    )
-
-    logger.info(
-        f"Trace input directory: "
-        f"{cfg.input_trace_dir}"
-    )
+    logger.info("=== GlobalRoamer AI Ingest Started ===")
+    logger.info(f"Environment: {cfg.env}")
+    logger.info(f"Trace input directory: {trace_dir}")
+    logger.info(f"Result input directory: {result_dir}")
+    logger.info(f"Report input directory: {report_dir}")
+    logger.info(f"Output directory: {output_dir}")
 
     try:
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-        # -------------------------------------------------
-        # Load traces
-        # -------------------------------------------------
+        loader = TraceLoader(trace_dir=trace_dir, result_dir=result_dir, report_dir=report_dir, template_dir=cfg.input_template_dir)
+        trace_parser = TraceParser()
+        normalizer = TraceNormalizer()
 
-        traces = load_all_traces(
-            trace_dir=cfg.input_trace_dir,
-            supported_extensions=[
-                ext.lower()
-                for ext in [
-                    ".csv",
-                    ".log",
-                    ".txt"
-                ]
-            ]
-        )
+        artifacts = loader.discover()
 
-        logger.info(
-            f"Loaded {len(traces)} trace files"
-        )
+        logger.info(f"Discovered {len(artifacts)} artifacts")
 
-        # -------------------------------------------------
-        # Process traces
-        # -------------------------------------------------
+        total_events = 0
 
-        for trace in traces:
+        for artifact in artifacts:
+            logger.info(f"Processing testcase: {artifact.testcase_id}")
 
-            metadata = trace["metadata"]
-            content = trace["content"]
+            parsed = trace_parser.parse(source=artifact, mapping_path=args.mapping_path)
+            events = normalizer.normalize(parsed)
 
-            trace_name = metadata["filename"]
+            parsed_path = output_dir / f"{artifact.testcase_id}_parsed.json"
+            events_path = output_dir / f"{artifact.testcase_id}_events.json"
 
-            logger.info(
-                f"Processing trace: {trace_name}"
-            )
+            save_json(asdict(parsed), parsed_path)
+            save_json([asdict(event) for event in events], events_path)
 
-            # ---------------------------------------------
-            # Parse
-            # ---------------------------------------------
+            total_events += len(events)
 
-            parsed_trace = parse_trace_content(
-                content=content,
-                metadata=metadata
-            )
+            logger.info(f"Processed testcase={artifact.testcase_id}, evidences={len(parsed.evidences)}, events={len(events)}")
+            print(f"Processed testcase={artifact.testcase_id}, evidences={len(parsed.evidences)}, events={len(events)}")
 
-            # ---------------------------------------------
-            # Normalize
-            # ---------------------------------------------
+        logger.info(f"=== GlobalRoamer AI Ingest Finished. Testcases={len(artifacts)}, events={total_events} ===")
 
-            normalized_trace = normalize_parsed_trace(
-                parsed_trace
-            )
-
-            # ---------------------------------------------
-            # Save normalized JSON
-            # ---------------------------------------------
-
-            save_normalized_trace(
-                normalized_trace,
-                cfg.normalized_dir
-            )
-
-            # ---------------------------------------------
-            # Chunking
-            # ---------------------------------------------
-
-            chunks = chunk_normalized_trace(
-                normalized_trace=normalized_trace,
-                chunk_size=cfg.chunk_size,
-                chunk_overlap=cfg.chunk_overlap
-            )
-
-            logger.info(
-                f"Generated {len(chunks)} chunks "
-                f"for {trace_name}"
-            )
-
-            # ---------------------------------------------
-            # Save chunks
-            # ---------------------------------------------
-
-            save_chunks(
-                chunks,
-                cfg.chunks_dir
-            )
-
-        logger.info(
-            "=== GlobalRoamer AI Ingest Finished ==="
-        )
-
-    except GlobalRoamerAIException as e:
-
-        logger.error(
-            f"Application error: {e}"
-        )
-
+    except GlobalRoamerAIException as exc:
+        logger.error(f"Application error: {exc}")
         raise
 
-    except Exception as e:
-
-        logger.exception(
-            f"Unexpected fatal error: {e}"
-        )
-
+    except Exception as exc:
+        logger.exception(f"Unexpected fatal error: {exc}")
         raise
 
 

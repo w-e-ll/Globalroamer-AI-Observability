@@ -1,51 +1,32 @@
 env: UAT
 
 paths:
-  base_dir: /home/<user>/apps/globalroamer_ai_observability
+  base_dir: C:/Users/valen/GlobalRoamer AI Observability Layer
 
-  # ======================================================
-  # INPUT
-  # ======================================================
+  input_trace_dir: ${base_dir}/var/input/traces
+  input_result_dir: ${base_dir}/var/input/results
+  input_report_dir: ${base_dir}/var/input/reports
+  input_template_dir: ${base_dir}/var/input/templates
+  input_campaign_dir: ${base_dir}/var/input/campaign_metadata
 
-  input_trace_dir: "${base_dir}/var/input/traces"
-  input_result_dir: "${base_dir}/var/input/results"
-  input_campaign_dir: "${base_dir}/var/input/campaign_metadata"
+  normalized_dir: ${base_dir}/var/data/normalized_events
+  chunks_dir: ${base_dir}/var/data/chunks
+  embeddings_dir: ${base_dir}/var/data/embeddings
+  vector_db_dir: ${base_dir}/var/data/vector_db
 
-  # ======================================================
-  # NORMALIZED / PROCESSED DATA
-  # ======================================================
+  ai_summary_dir: ${base_dir}/var/output/ai_summaries
+  root_cause_dir: ${base_dir}/var/output/root_cause_reports
+  campaign_health_dir: ${base_dir}/var/output/campaign_health
 
-  normalized_dir: "${base_dir}/var/data/normalized_events"
-  chunks_dir: "${base_dir}/var/data/chunks"
-  embeddings_dir: "${base_dir}/var/data/embeddings"
-
-  # ======================================================
-  # VECTOR STORAGE
-  # ======================================================
-
-  vector_db_dir: "${base_dir}/var/data/vector_db"
-
-  # ======================================================
-  # OUTPUTS
-  # ======================================================
-
-  ai_summary_dir: "${base_dir}/var/output/ai_summaries"
-  root_cause_dir: "${base_dir}/var/output/root_cause_reports"
-  campaign_health_dir: "${base_dir}/var/output/campaign_health"
-
-  # ======================================================
-  # LOGGING
-  # ======================================================
-
-  log_dir: "${base_dir}/var/log"
+  log_dir: ${base_dir}/var/log
 
 ai:
   embedding_model: "text-embedding-3-small"
 
   llm_model: "gpt-4.1-mini"
 
-  chunk_size: 4000
-  chunk_overlap: 400
+  chunk_size: 2000
+  chunk_overlap: 200
 
 vector_db:
   provider: "chromadb"

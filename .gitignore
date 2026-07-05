@@ -1,61 +1,42 @@
 # Python
 __pycache__/
-*.py[cod]
+*.pyc
 *.pyo
 *.pyd
-*.egg-info/
-dist/
-build/
-
-# Virtual environments
-venv/
+.pytest_cache/
 .venv/
-env/
 
-# Environment / secrets
-.env
-*.env
-.env.*
-!.env.example
-
-# Logs
-var/log/
-*.log
-*.log.*
-
-# Runtime data
-var/data/
-var/output/
-var/input/
-
-# ChromaDB / vector storage
-*.sqlite3
-*.db
-chroma/
-vector_db/
-
-# OS / IDE
-.DS_Store
-Thumbs.db
+# IDE
 .idea/
 .vscode/
 
-# Tests / coverage
-.pytest_cache/
-.coverage
-htmlcov/
+# OS
+.DS_Store
+Thumbs.db
 
-# Temporary files
-tmp/
-temp/
-*.tmp
+# Logs
+*.log
 
-# Reports / generated artifacts
-*.md.tmp
-*.json.tmp
-*.xlsx
-*.zip
+# Runtime / generated data
+var/data/
+var/output/
 
-# Local notebooks
-.ipynb_checkpoints/
-*.ipynb
+# Temporary traces
+var/input/traces/
+
+# Chroma / vector db
+chroma_db/
+
+# Streamlit cache
+.streamlit/
+
+# Environment
+.env
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# PPT temp
+~$*.pptx
