@@ -25,7 +25,7 @@ AI-powered telecom operational intelligence platform reducing MTTR through seman
 
 ## 🎬 Demo Video
 
-Click the image above to watch the full demo walkthrough: https://youtu.be/V9X12x59-AI
+Click the image above to watch the full demo walkthrough: [https://youtu.be/nUBetCyIrtU](https://youtu.be/nUBetCyIrtU)
 
 ---
 
